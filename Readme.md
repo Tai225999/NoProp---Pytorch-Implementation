@@ -10,10 +10,8 @@ Implementation of the NoProp learning method from the paper ["NOPROP: TRAINING N
 - [Overview](#overview)
 - [Project Structure](#project-structure)
 - [Core Concept](#core-concept)
-- [Implementation Details](#implementation-details)
 - [Getting Started](#getting-started)
 - [Usage](#usage)
-- [Results](#results)
 - [Citation](#citation)
 
 ## Overview
@@ -40,46 +38,37 @@ NoProp/
 └── visualize.py          # Visualization tools
 ```
 
-## Core Concept
+## Core concept of NoProp
 
-### Traditional vs NoProp Approach
+**NoProp** introduces an alternative training framework that obviates the need for end-to-end forward and backward signal propagation during the parameter update phase for individual network components.
 
-| Aspect | Traditional | NoProp |
-|--------|-------------|---------|
-| Training Flow | Sequential forward/backward | Independent block training |
-| Learning Process | Error propagation | Denoising noisy targets |
-| Layer Dependencies | Strong | None |
-| Parallelization | Limited | High |
+1.  **Decentralized Component Training**:
+    * A fundamental departure from back-propagation is that NoProp enables the constituent modules (termed "blocks" or layers) of the neural network to be trained **independently**.
+    * This negates the requirement for global error signal propagation across the entire network depth for the training of each distinct block.
 
-### Key Components
+2.  **Learning via Denoising**:
+    * The conceptual foundation of NoProp is derived from generative modeling techniques, particularly those related to denoising diffusion processes.
+    * The primary learning objective for each block is to reconstruct a "clean" target representation (an embedding of the true class label) when provided with both the original input data and a **perturbed or "noisy" version of this target representation**.
+    * This task effectively trains each block as a conditional denoising function.
 
-1. **Denoising Blocks**: Each block learns to predict clean target embeddings
-2. **Noise Schedule**: Cosine schedule for controlled noise addition
-3. **Embedding Strategies**:
-   - One-hot (fixed)
-   - Learned (trainable)
-   - Prototype (data-initialized)
+3.  **Mechanism of Independent Block Training**:
+    * Each block's parameters are optimized to enhance its denoising capability. The predicted clean representation is compared to the ground-truth clean representation, and the block's parameters are adjusted to minimize this discrepancy.
+    * The noisy input representation supplied to a given block during its training is generated directly from the true clean target representation and a predefined noise schedule. This input is not the output of a preceding block in a sequential pass, thereby facilitating independent training.
 
-## Implementation Details
+4.  **Nature of Intermediate Representations**:
+    * Unlike conventional deep learning where layers progressively learn and transform representations, NoProp operates with **predetermined intermediate target representations**.
+    * During training, the input to each block (excluding the raw data input x) is a noisy version of the *final* target embedding, with the noise level dictated by a predefined schedule.
+    * Consequently, blocks are not primarily learning to transform representations hierarchically but are specializing in denoising specific noise characteristics from a target, conditioned on the input data.
 
-### Model Architecture
-- **NoPropNetDT**: Main network with T denoising blocks
-- **NoPropBlock**: Core denoising unit with CNN and MLP pathways
+5.  **Inference Procedure**:
+    * While training is characterized by independent block updates, the inference (prediction) phase is sequential.
+    * The process commences with an initial state of pure noise.
+    * This noisy state is then iteratively refined by passing it sequentially through the series of trained denoising blocks. Each block, conditioned on the input data, processes the output of the preceding block, aiming to reduce noise and move the state closer to a clean target representation.
+    * Upon completion of T denoising steps, the resultant refined state is input to a final classification layer to produce the output prediction.
 
-### Training Process
-- Independent block training
-- Cosine noise schedule
-- Learning rate warmup
-- Early stopping
-- Checkpoint management
 
-### Visualization Tools
-- Training history plots
-- Embedding visualizations
-- Confusion matrices
-- Prediction analysis
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 ```bash
@@ -97,18 +86,6 @@ python main.py \
     --epochs 150 \
     --lr 0.001 \
     --weight-decay 0.0001
-```
-
-## Results
-
-Training results are stored in `checkpoints_run/` with:
-- Model checkpoints
-- Training history logs
-- Visualization plots
-
-Use `visualize.py` to analyze results:
-```bash
-python visualize.py --history path/to/training_history.json
 ```
 
 ## Citation
